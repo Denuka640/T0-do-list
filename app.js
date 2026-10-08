@@ -1,14 +1,20 @@
 /**
- * TaskFlow — Modern To-Do List Application with Text File Storage
+ * TaskFlow — Modern To-Do List Application & Multi-Tool Suite
  */
 
 // Application State
 let items = [];
 let currentFilter = 'all';
 let searchQuery = '';
-let fileHandle = null; // Store File System Access API handle if available
+let fileHandle = null;
 
-// DOM Element References
+// DOM Element References — Header & Tabs
+const themeToggle = document.querySelector('#theme-toggle');
+const currentDateEl = document.querySelector('#current-date');
+const navTabs = document.querySelectorAll('.nav-tab');
+const tabContents = document.querySelectorAll('.app-tab-content');
+
+// DOM Element References — Tasks Tab
 const form = document.querySelector('#todo-form');
 const input = document.querySelector('#new-item');
 const priorityInput = document.querySelector('#priority');
@@ -18,7 +24,6 @@ const searchInput = document.querySelector('#search-input');
 const clearSearchBtn = document.querySelector('#clear-search');
 const filterTabs = document.querySelectorAll('.filter-tab');
 const clearCompletedBtn = document.querySelector('#clear-completed-btn');
-const themeToggle = document.querySelector('#theme-toggle');
 const progressText = document.querySelector('#progress-text');
 const progressPercent = document.querySelector('#progress-percent');
 const progressFill = document.querySelector('#progress-fill');
@@ -26,7 +31,31 @@ const saveFileBtn = document.querySelector('#save-file-btn');
 const openFileBtn = document.querySelector('#open-file-btn');
 const fileInput = document.querySelector('#file-input');
 const toastContainer = document.querySelector('#toast-container');
-const currentDateEl = document.querySelector('#current-date');
+
+// DOM Element References — Stopwatch Tab
+const swDisplay = document.querySelector('#sw-display');
+const swStartBtn = document.querySelector('#sw-start');
+const swStopBtn = document.querySelector('#sw-stop');
+const swLapBtn = document.querySelector('#sw-lap');
+const swResetBtn = document.querySelector('#sw-reset');
+const swLapsWrapper = document.querySelector('#sw-laps-wrapper');
+const swLapsList = document.querySelector('#sw-laps');
+
+// DOM Element References — Timer Tab
+const tmDisplay = document.querySelector('#tm-display');
+const tmInputSeconds = document.querySelector('#tm-input-seconds');
+const tmStartBtn = document.querySelector('#tm-start');
+const tmStopBtn = document.querySelector('#tm-stop');
+const tmResetBtn = document.querySelector('#tm-reset');
+const tmPresetBtns = document.querySelectorAll('.tm-preset');
+
+// DOM Element References — Alarm Tab
+const alarmClockDisplay = document.querySelector('#alarm-clock-display');
+const alarmTimeInput = document.querySelector('#alarm-time-input');
+const setAlarmBtn = document.querySelector('#set-alarm-btn');
+const clearAlarmBtn = document.querySelector('#clear-alarm-btn');
+const alarmStatusBadge = document.querySelector('#alarm-status');
+const alarmTargetText = document.querySelector('#alarm-target-text');
 
 // Priority Names mapping
 const PRIORITY_LABELS = {
@@ -43,6 +72,9 @@ function init() {
   displayDate();
   loadItemsFromStorage();
   attachEventListeners();
+  initStopwatch();
+  initTimer();
+  initAlarmClock();
   render();
 }
 
@@ -50,7 +82,7 @@ function init() {
 function displayDate() {
   if (!currentDateEl) return;
   const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
-  currentDateEl.textContent = new Date().toLocaleDateString('en-US', options) + ' • Text File Storage';
+  currentDateEl.textContent = new Date().toLocaleDateString('en-US', options) + ' • Multi-Tool Suite';
 }
 
 // Security: Escape HTML to prevent XSS
@@ -81,6 +113,19 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
+// Nav Tab Switcher (Part 4 requirement)
+function switchTab(targetTabId) {
+  navTabs.forEach(tab => {
+    const isSelected = tab.dataset.tab === targetTabId;
+    tab.classList.toggle('active', isSelected);
+    tab.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+  });
+
+  tabContents.forEach(content => {
+    content.classList.toggle('active', content.id === targetTabId);
+  });
+}
+
 // LocalStorage Persistence
 function saveItemsToStorage() {
   try {
@@ -96,7 +141,6 @@ function loadItemsFromStorage() {
     if (stored) {
       items = JSON.parse(stored);
     } else {
-      // Default initial items if completely empty
       items = [
         { id: '1', text: 'Welcome to TaskFlow! Double-click to edit me.', priority: 3, done: false, createdAt: Date.now() },
         { id: '2', text: 'Click "Save .txt" to download or sync tasks to a text file', priority: 5, done: false, createdAt: Date.now() - 1000 }
@@ -111,7 +155,6 @@ function loadItemsFromStorage() {
 
 // Text File Storage Utilities (.txt format)
 function serializeToTxt(taskList) {
-  // Format each line as: [ ] (P3) Task text
   return taskList.map(item => {
     const status = item.done ? '[x]' : '[ ]';
     const prio = `(P${item.priority || 3})`;
@@ -120,7 +163,6 @@ function serializeToTxt(taskList) {
 }
 
 function parseFromTxt(textContent) {
-  // Try parsing as JSON first
   try {
     const jsonParsed = JSON.parse(textContent);
     if (Array.isArray(jsonParsed)) {
@@ -132,9 +174,7 @@ function parseFromTxt(textContent) {
         createdAt: item.createdAt || Date.now()
       }));
     }
-  } catch (e) {
-    // Plain text line-by-line fallback parsing
-  }
+  } catch (e) {}
 
   const lines = textContent.split(/\r?\n/).filter(line => line.trim().length > 0);
   const parsedItems = [];
@@ -144,14 +184,12 @@ function parseFromTxt(textContent) {
     let priority = 3;
     let text = line.trim();
 
-    // Check for [x] or [ ]
     const doneMatch = text.match(/^\[([ xX])\]\s*/);
     if (doneMatch) {
       done = doneMatch[1].toLowerCase() === 'x';
       text = text.substring(doneMatch[0].length).trim();
     }
 
-    // Check for (P1) to (P5)
     const priorityMatch = text.match(/^\(P([1-5])\)\s*/i);
     if (priorityMatch) {
       priority = parseInt(priorityMatch[1], 10);
@@ -172,20 +210,15 @@ function parseFromTxt(textContent) {
   return parsedItems;
 }
 
-// File Save handler (.txt)
 async function saveToTextFile() {
   const txtData = serializeToTxt(items);
 
-  // Use File System Access API if supported
   if ('showSaveFilePicker' in window) {
     try {
       if (!fileHandle) {
         fileHandle = await window.showSaveFilePicker({
           suggestedName: 'tasks.txt',
-          types: [{
-            description: 'Text Files',
-            accept: { 'text/plain': ['.txt'] }
-          }]
+          types: [{ description: 'Text Files', accept: { 'text/plain': ['.txt'] } }]
         });
       }
       const writable = await fileHandle.createWritable();
@@ -194,12 +227,10 @@ async function saveToTextFile() {
       showToast('Tasks saved to text file!', 'success');
       return;
     } catch (err) {
-      if (err.name === 'AbortError') return; // User cancelled
-      console.warn('FilePicker error, falling back to download:', err);
+      if (err.name === 'AbortError') return;
     }
   }
 
-  // Fallback download mechanism
   const blob = new Blob([txtData], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -212,15 +243,11 @@ async function saveToTextFile() {
   showToast('Downloaded tasks.txt file', 'success');
 }
 
-// File Open handler (.txt)
 async function openTextFile() {
   if ('showOpenFilePicker' in window) {
     try {
       const [handle] = await window.showOpenFilePicker({
-        types: [{
-          description: 'Text or JSON Files',
-          accept: { 'text/plain': ['.txt'], 'application/json': ['.json'] }
-        }]
+        types: [{ description: 'Text or JSON Files', accept: { 'text/plain': ['.txt'], 'application/json': ['.json'] } }]
       });
       fileHandle = handle;
       const file = await fileHandle.getFile();
@@ -238,11 +265,9 @@ async function openTextFile() {
       return;
     } catch (err) {
       if (err.name === 'AbortError') return;
-      console.warn('OpenFilePicker fallback:', err);
     }
   }
 
-  // Fallback trigger hidden input
   fileInput.click();
 }
 
@@ -267,7 +292,7 @@ function handleFileInputChange(e) {
   reader.readAsText(file);
 }
 
-// Add Item
+// Add Task Item
 function addItem(e) {
   e.preventDefault();
   const text = input.value.trim();
@@ -278,15 +303,13 @@ function addItem(e) {
     return;
   }
 
-  const newItem = {
+  items.unshift({
     id: String(Date.now()),
     text: text,
     priority: priority >= 1 && priority <= 5 ? priority : 3,
     done: false,
     createdAt: Date.now()
-  };
-
-  items.unshift(newItem);
+  });
   saveItemsToStorage();
 
   input.value = '';
@@ -411,7 +434,6 @@ function startEditing(taskItem, itemId) {
   });
 }
 
-// Sort by Priority (Highest Priority 5 down to 1 first)
 function sortItems() {
   items.sort((a, b) => b.priority - a.priority);
   saveItemsToStorage();
@@ -419,11 +441,8 @@ function sortItems() {
   showToast('Sorted by priority (High to Low)', 'info');
 }
 
-// Clear Completed
 function clearCompleted() {
-  const activeCount = items.filter(i => !i.done).length;
-  const completedCount = items.length - activeCount;
-
+  const completedCount = items.filter(i => i.done).length;
   if (completedCount === 0) {
     showToast('No completed tasks to clear', 'info');
     return;
@@ -481,14 +500,12 @@ function attachDragAndDrop() {
 
     li.addEventListener('drop', (e) => {
       e.preventDefault();
-      // Update state array to match new DOM order
       const newOrderIds = Array.from(itemsList.querySelectorAll('.task-item')).map(el => el.dataset.id);
       const reorderedItems = [];
       newOrderIds.forEach(id => {
         const found = items.find(i => i.id === id);
         if (found) reorderedItems.push(found);
       });
-      // Append any non-visible tasks
       items.forEach(i => {
         if (!reorderedItems.includes(i)) reorderedItems.push(i);
       });
@@ -498,8 +515,218 @@ function attachDragAndDrop() {
   });
 }
 
+// ==========================================
+// STOPWATCH MODULE (Part 1 from PDF)
+// ==========================================
+let swInterval = null;
+let swStartTime = 0;
+let swElapsedTime = 0;
+let swLaps = [];
+
+function initStopwatch() {
+  function formatStopwatch(ms) {
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+    const milliseconds = ms % 1000;
+
+    const pad = (n, len = 2) => String(n).padStart(len, '0');
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}.${pad(milliseconds, 3)}`;
+  }
+
+  function updateSwDisplay() {
+    swDisplay.textContent = formatStopwatch(swElapsedTime);
+  }
+
+  swStartBtn.addEventListener('click', () => {
+    swStartTime = Date.now() - swElapsedTime;
+    swInterval = setInterval(() => {
+      swElapsedTime = Date.now() - swStartTime;
+      updateSwDisplay();
+    }, 10);
+
+    swStartBtn.disabled = true;
+    swStopBtn.disabled = false;
+    swLapBtn.disabled = false;
+  });
+
+  swStopBtn.addEventListener('click', () => {
+    clearInterval(swInterval);
+    swStartBtn.disabled = false;
+    swStopBtn.disabled = true;
+    swLapBtn.disabled = true;
+  });
+
+  swLapBtn.addEventListener('click', () => {
+    swLaps.unshift(formatStopwatch(swElapsedTime));
+    renderSwLaps();
+  });
+
+  swResetBtn.addEventListener('click', () => {
+    clearInterval(swInterval);
+    swElapsedTime = 0;
+    swLaps = [];
+    updateSwDisplay();
+    renderSwLaps();
+    swStartBtn.disabled = false;
+    swStopBtn.disabled = true;
+    swLapBtn.disabled = true;
+  });
+
+  function renderSwLaps() {
+    if (swLaps.length === 0) {
+      swLapsWrapper.classList.add('hidden');
+      swLapsList.innerHTML = '';
+      return;
+    }
+    swLapsWrapper.classList.remove('hidden');
+    swLapsList.innerHTML = swLaps.map((lap, idx) => `
+      <li class="lap-item">
+        <span>Lap ${swLaps.length - idx}</span>
+        <strong>${lap}</strong>
+      </li>
+    `).join('');
+  }
+}
+
+// ==========================================
+// COUNTDOWN TIMER MODULE (Part 2 from PDF)
+// ==========================================
+let tmInterval = null;
+let tmTimeLeftMs = 0;
+
+function initTimer() {
+  function formatTimer(ms) {
+    if (ms < 0) ms = 0;
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+
+  function updateTmDisplay() {
+    tmDisplay.textContent = formatTimer(tmTimeLeftMs);
+  }
+
+  tmStartBtn.addEventListener('click', () => {
+    if (tmTimeLeftMs <= 0) {
+      const inputSec = parseInt(tmInputSeconds.value, 10);
+      if (isNaN(inputSec) || inputSec <= 0) {
+        showToast('Please enter a valid time in seconds', 'warning');
+        return;
+      }
+      tmTimeLeftMs = inputSec * 1000;
+    }
+
+    updateTmDisplay();
+    tmStartBtn.disabled = true;
+    tmStopBtn.disabled = false;
+
+    tmInterval = setInterval(() => {
+      tmTimeLeftMs -= 1000;
+      updateTmDisplay();
+
+      if (tmTimeLeftMs <= 0) {
+        clearInterval(tmInterval);
+        tmStartBtn.disabled = false;
+        tmStopBtn.disabled = true;
+        showToast("⏰ Time's up!", 'warning');
+        alert("Time's up!");
+      }
+    }, 1000);
+  });
+
+  tmStopBtn.addEventListener('click', () => {
+    clearInterval(tmInterval);
+    tmStartBtn.disabled = false;
+    tmStopBtn.disabled = true;
+  });
+
+  tmResetBtn.addEventListener('click', () => {
+    clearInterval(tmInterval);
+    tmTimeLeftMs = 0;
+    tmInputSeconds.value = '';
+    updateTmDisplay();
+    tmStartBtn.disabled = false;
+    tmStopBtn.disabled = true;
+  });
+
+  tmPresetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sec = parseInt(btn.dataset.sec, 10);
+      tmInputSeconds.value = sec;
+      tmTimeLeftMs = sec * 1000;
+      updateTmDisplay();
+    });
+  });
+}
+
+// ==========================================
+// ALARM CLOCK MODULE (Part 3 from PDF)
+// ==========================================
+let alarmInterval = null;
+let targetAlarmTimeStr = '';
+
+function initAlarmClock() {
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function updateClock() {
+    const now = new Date();
+    const currentTimeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    alarmClockDisplay.textContent = currentTimeStr;
+
+    if (targetAlarmTimeStr) {
+      // Input value is HH:MM or HH:MM:SS
+      const fullTarget = targetAlarmTimeStr.length === 5 ? `${targetAlarmTimeStr}:00` : targetAlarmTimeStr;
+      if (currentTimeStr === fullTarget) {
+        showToast('🔔 Wake up! Alarm is ringing!', 'warning');
+        alert('Wake up! Alarm is ringing.');
+        clearAlarm();
+      }
+    }
+  }
+
+  alarmInterval = setInterval(updateClock, 1000);
+  updateClock();
+
+  setAlarmBtn.addEventListener('click', () => {
+    const val = alarmTimeInput.value;
+    if (!val) {
+      showToast('Please select a valid alarm time', 'warning');
+      return;
+    }
+
+    targetAlarmTimeStr = val;
+    alarmTargetText.textContent = targetAlarmTimeStr;
+    alarmStatusBadge.classList.remove('hidden');
+    setAlarmBtn.disabled = true;
+    clearAlarmBtn.disabled = false;
+    showToast(`Alarm set for ${targetAlarmTimeStr}`, 'info');
+  });
+
+  clearAlarmBtn.addEventListener('click', clearAlarm);
+
+  function clearAlarm() {
+    targetAlarmTimeStr = '';
+    alarmTimeInput.value = '';
+    alarmStatusBadge.classList.add('hidden');
+    setAlarmBtn.disabled = false;
+    clearAlarmBtn.disabled = true;
+    showToast('Alarm cleared', 'info');
+  }
+}
+
 // Event Listeners Registration
 function attachEventListeners() {
+  // Main Nav Tabs Listener (Part 4 requirement)
+  navTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchTab(tab.dataset.tab);
+    });
+  });
+
   form.addEventListener('submit', addItem);
   sortBtn.addEventListener('click', sortItems);
   clearCompletedBtn.addEventListener('click', clearCompleted);

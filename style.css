@@ -81,7 +81,7 @@ body {
   gap: 20px;
 }
 
-/* Header */
+/* Header & Main Nav */
 .app-header {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -161,6 +161,57 @@ h1 {
 [data-theme="dark"] .moon-icon, body:not([data-theme="light"]) .moon-icon { display: none; }
 [data-theme="dark"] .sun-icon, body:not([data-theme="light"]) .sun-icon { display: block; }
 
+/* Main Navigation Tabs */
+.main-nav-tabs {
+  display: flex;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.nav-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.nav-tab:hover {
+  color: var(--text-main);
+}
+
+.nav-tab.active {
+  background: var(--card-bg);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Tab Sections */
+.app-tab-content {
+  display: none;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.app-tab-content.active {
+  display: flex;
+}
+
 /* File Toolbar */
 .file-toolbar {
   display: flex;
@@ -205,6 +256,12 @@ h1 {
   cursor: pointer;
   transition: var(--transition);
   white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-sm {
@@ -256,6 +313,10 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  padding: 16px;
+  border-radius: var(--radius);
 }
 
 .progress-info {
@@ -287,7 +348,7 @@ h1 {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 20px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -313,9 +374,9 @@ h1 {
   pointer-events: none;
 }
 
-input[type="text"] {
+input[type="text"], input[type="number"], input[type="time"] {
   width: 100%;
-  padding: 12px 14px 12px 42px;
+  padding: 12px 14px;
   font-size: 0.95rem;
   font-family: inherit;
   background: var(--input-bg);
@@ -325,7 +386,11 @@ input[type="text"] {
   transition: var(--transition);
 }
 
-input[type="text"]:focus {
+input[type="text"] {
+  padding-left: 42px;
+}
+
+input[type="text"]:focus, input[type="number"]:focus, input[type="time"]:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-light);
@@ -453,7 +518,6 @@ input[type="text"]:focus {
 
 .task-item.dragging {
   opacity: 0.4;
-  border-dash: 2px dashed var(--primary);
 }
 
 .drag-handle {
@@ -587,6 +651,139 @@ input[type="text"]:focus {
   color: var(--danger);
 }
 
+/* Utility Tool Cards (Stopwatch, Timer, Alarm) */
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 24px;
+  padding: 36px 24px;
+}
+
+.tool-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.digital-display {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  padding: 16px 28px;
+  border-radius: var(--radius);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+  min-width: 280px;
+}
+
+.tool-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Stopwatch Laps */
+.laps-container {
+  width: 100%;
+  max-width: 400px;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+
+.laps-container.hidden { display: none; }
+
+.laps-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.laps-list {
+  list-style: none;
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lap-item {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.88rem;
+  padding: 6px 10px;
+  background: var(--card-bg);
+  border-radius: 4px;
+}
+
+/* Timer & Alarm Inputs */
+.timer-inputs, .alarm-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.input-field-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+
+.input-field-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  width: 100%;
+}
+
+.clock-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.clock-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.alarm-status-badge {
+  padding: 10px 14px;
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+  font-size: 0.88rem;
+}
+
+.alarm-status-badge.hidden { display: none; }
+
 /* Empty State */
 .empty-state {
   text-align: center;
@@ -664,6 +861,12 @@ input[type="text"]:focus {
     padding: 16px 10px;
   }
   
+  .digital-display {
+    font-size: 2rem;
+    min-width: 220px;
+    padding: 12px 18px;
+  }
+
   .controls-toolbar {
     flex-direction: column;
     align-items: stretch;
